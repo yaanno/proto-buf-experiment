@@ -19,6 +19,20 @@ go run cmd/main.go
 - Detects and handles calculation overflow
 - Generates a unique request ID if not provided
 
+## Logging
+- Structured logging with Zerolog
+- Logs calculation inputs and results
+- Captures detailed error information
+- Configurable log levels
+- Logs written to console and file
+- JSON-formatted log output
+- Contextual logging with request IDs
+
+### Log Configuration
+- `DEBUG` environment variable controls log verbosity
+- Log files stored in configurable location
+- Supports rotation and retention policies
+
 ## Dependencies
 - gRPC
 - Protocol Buffers

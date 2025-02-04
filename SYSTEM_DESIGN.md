@@ -89,8 +89,16 @@ A simple calculator service specializing in addition operations, designed to pro
 - Support for more mathematical operations
 - Advanced error handling
 - Distributed deployment
-- Monitoring and observability
+- **Completed: Implemented structured logging**
 - Authentication mechanisms
+- Advanced logging features
+
+### Logging and Observability
+- Implemented structured logging using Zerolog
+- Supports console and file logging
+- Contextual logging with request IDs
+- Configurable log levels and output
+- JSON-formatted log output for easy parsing
 
 ## 7. Decision Log
 
@@ -120,16 +128,18 @@ A simple calculator service specializing in addition operations, designed to pro
 
 ## 9. Stakeholder Considerations
 
-### Target Audience
+#### Target Audience
 - Software engineers learning distributed systems
 - Go developers exploring microservices
 - Students and self-learners
+- DevOps and SRE professionals interested in logging practices
 
-### Success Criteria
+#### Success Criteria
 - Clear, understandable implementation
 - Demonstrable inter-service communication
 - Ease of comprehension
 - Potential for incremental learning
+- **Robust logging and observability**
 
 ## 10. Conclusion
 

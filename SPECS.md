@@ -178,7 +178,16 @@ message ErrorDetails {
 - [ ] Simple error recovery
 
 #### Observability
-- [ ] Basic logging
+- [x] Structured logging
+  - Implemented using Zerolog
+  - Log calculation inputs and outputs
+  - Log errors with context
+  - JSON-formatted log output
+  - Supports console and file logging
+  - Configurable log levels
+  - Contextual logging with request IDs
+  - Minimal performance overhead
+- [x] Basic logging
   - Log calculation inputs
   - Log errors
   - Use structured logging format

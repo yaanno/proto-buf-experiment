@@ -21,6 +21,19 @@ A web service that translates HTTP requests to gRPC calls for the Calculation Se
 - Timeout handling
 - Error propagation
 
+## Logging
+- Structured logging with Zerolog
+- Logs request details, calculation results, and errors
+- Configurable log levels
+- Logs written to console and file
+- JSON-formatted log output
+- Contextual logging with request IDs
+
+### Log Configuration
+- `DEBUG` environment variable controls log verbosity
+- Log files stored in configurable location
+- Supports rotation and retention policies
+
 ## Running the Service
 ```bash
 go run cmd/main.go
