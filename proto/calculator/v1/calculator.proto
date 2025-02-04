@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package calculator.v1;
+
+option go_package = "github.com/yourusername/proto-buf-experiment/gen/calculator/v1";
+
+service AdditionService {
+  // Add numbers and return the sum
+  rpc Add(AddRequest) returns (AddResponse) {}
+}
+
+message AddRequest {
+  // Unique identifier for the request
+  string request_id = 1;
+  
+  // Numbers to be added
+  repeated double numbers = 2;
+}
+
+message AddResponse {
+  // Calculation result
+  double result = 1;
+  
+  // Optional error message
+  string error = 2;
+  
+  // Original request ID for correlation
+  string request_id = 3;
+}
