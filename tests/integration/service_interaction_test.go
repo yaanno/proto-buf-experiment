@@ -14,7 +14,7 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 
 	pb "github.com/yourusername/proto-buf-experiment/gen/go/calculator/v1"
-	calculationService "github.com/yourusername/proto-buf-experiment/services/calculation/internal/service"
+	calculationService "github.com/yourusername/proto-buf-experiment/services/calculation/service"
 )
 
 const bufSize = 1024 * 1024

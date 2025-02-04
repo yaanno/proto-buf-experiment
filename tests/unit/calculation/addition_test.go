@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	pb "github.com/yourusername/proto-buf-experiment/gen/go/calculator/v1"
-	"github.com/yourusername/proto-buf-experiment/services/calculation/internal/service"
+	"github.com/yourusername/proto-buf-experiment/services/calculation/service"
 )
 
 func TestAdditionService_Add(t *testing.T) {
@@ -55,7 +55,7 @@ func TestAdditionService_Add(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			req := &pb.AddRequest{
-				Numbers:    tc.numbers,
+				Numbers:   tc.numbers,
 				RequestId: "test-request-id",
 			}
 
@@ -93,7 +93,7 @@ func TestAdditionService_RequestIDGeneration(t *testing.T) {
 func BenchmarkAdditionService_Add(b *testing.B) {
 	calculationService := service.NewAdditionService()
 	req := &pb.AddRequest{
-		Numbers:    []float64{1.0, 2.0, 3.0, 4.0, 5.0},
+		Numbers:   []float64{1.0, 2.0, 3.0, 4.0, 5.0},
 		RequestId: "bench-request-id",
 	}
 

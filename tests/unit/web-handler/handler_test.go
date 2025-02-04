@@ -13,7 +13,7 @@ import (
 	"google.golang.org/grpc"
 
 	pb "github.com/yourusername/proto-buf-experiment/gen/go/calculator/v1"
-	"github.com/yourusername/proto-buf-experiment/services/web-handler/cmd"
+	webhandler "github.com/yourusername/proto-buf-experiment/services/web-handler/internal"
 )
 
 // MockCalculationClient is a mock type for the AdditionServiceClient
@@ -29,7 +29,7 @@ func (m *MockCalculationClient) Add(ctx context.Context, in *pb.AddRequest, opts
 func TestAddHandler_SuccessfulAddition(t *testing.T) {
 	// Create mock gRPC client
 	mockClient := new(MockCalculationClient)
-	
+
 	// Prepare test data
 	numbers := []float64{5.5, 3.7}
 	expectedResult := 9.2
@@ -38,13 +38,13 @@ func TestAddHandler_SuccessfulAddition(t *testing.T) {
 	// Setup mock expectation
 	mockClient.On("Add", mock.Anything, mock.Anything, mock.Anything).
 		Return(&pb.AddResponse{
-			Result:     expectedResult,
-			RequestId:  expectedRequestID,
-			Error:      "",
+			Result:    expectedResult,
+			RequestId: expectedRequestID,
+			Error:     "",
 		}, nil)
 
 	// Create web handler
-	handler := cmd.NewWebHandler(mockClient)
+	handler := webhandler.NewWebHandler(mockClient)
 
 	// Prepare request body
 	reqBody, _ := json.Marshal(map[string][]float64{
@@ -54,7 +54,7 @@ func TestAddHandler_SuccessfulAddition(t *testing.T) {
 	// Create HTTP request
 	req := httptest.NewRequest(http.MethodPost, "/add", bytes.NewBuffer(reqBody))
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	// Create response recorder
 	w := httptest.NewRecorder()
 
@@ -89,9 +89,9 @@ func TestAddHandler_ErrorHandling(t *testing.T) {
 			name:        "Empty Input",
 			requestBody: []float64{},
 			mockServerResponse: &pb.AddResponse{
-				Result:     0,
-				Error:      "no numbers provided",
-				RequestId:  "error-request-id",
+				Result:    0,
+				Error:     "no numbers provided",
+				RequestId: "error-request-id",
 			},
 			expectedStatusCode: http.StatusOK,
 		},
@@ -107,7 +107,7 @@ func TestAddHandler_ErrorHandling(t *testing.T) {
 				Return(tc.mockServerResponse, nil)
 
 			// Create web handler
-			handler := cmd.NewWebHandler(mockClient)
+			handler := webhandler.NewWebHandler(mockClient)
 
 			// Prepare request body
 			reqBody, _ := json.Marshal(map[string][]float64{
@@ -117,7 +117,7 @@ func TestAddHandler_ErrorHandling(t *testing.T) {
 			// Create HTTP request
 			req := httptest.NewRequest(http.MethodPost, "/add", bytes.NewBuffer(reqBody))
 			req.Header.Set("Content-Type", "application/json")
-			
+
 			// Create response recorder
 			w := httptest.NewRecorder()
 
