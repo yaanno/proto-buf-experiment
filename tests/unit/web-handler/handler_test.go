@@ -14,6 +14,7 @@ import (
 	"google.golang.org/grpc"
 
 	v1 "github.com/yourusername/proto-buf-experiment/gen/go/calculator/v1"
+	"github.com/yourusername/proto-buf-experiment/pkg/logging"
 	webhandler "github.com/yourusername/proto-buf-experiment/services/web-handler/service"
 )
 
@@ -117,8 +118,18 @@ func TestAddHandler(t *testing.T) {
 			mockClient := new(MockAdditionServiceClient)
 			mockClient.On("Add", mock.Anything, mock.Anything, mock.Anything).Return(tc.mockServiceResp, nil)
 
+			// log config
+			logConfig := logging.LogConfig{
+				ServiceName: "web-handler",
+				Debug:       true,
+				WriteToFile: true,
+			}
+
+			// Create logger
+			logger := logging.NewLogger(logConfig)
+
 			// Create web handler
-			handler := webhandler.NewWebHandler(mockClient)
+			handler := webhandler.NewWebHandler(mockClient, logger)
 
 			// Prepare request body
 			jsonBody, err := json.Marshal(tc.requestBody)

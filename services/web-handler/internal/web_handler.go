@@ -1,16 +1,21 @@
 package webhandler
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/rs/zerolog"
 
 	v1 "github.com/yourusername/proto-buf-experiment/gen/go/calculator/v1"
+	"github.com/yourusername/proto-buf-experiment/pkg/logging"
 )
 
 type WebHandler struct {
 	calculationClient v1.AdditionServiceClient
+	logger            zerolog.Logger
 }
 
 type AddRequest struct {
@@ -39,9 +44,13 @@ type CalcMetadata struct {
 	CalculationMethod string `json:"calculation_method"`
 }
 
-func NewWebHandler(calculationClient v1.AdditionServiceClient) *WebHandler {
+func NewWebHandler(
+	calculationClient v1.AdditionServiceClient,
+	logger logging.Logger,
+) *WebHandler {
 	return &WebHandler{
 		calculationClient: calculationClient,
+		logger:            logger.Logger,
 	}
 }
 
@@ -49,61 +58,94 @@ func (h *WebHandler) AddHandler(w http.ResponseWriter, r *http.Request) {
 	// Set content type to JSON
 	w.Header().Set("Content-Type", "application/json")
 
+	// Generate request ID
+	requestID := uuid.New().String()
+
+	// Create request scoped logger
+	requestLogger := h.logger.With().
+		Str("request_id", requestID).
+		Str("method", r.Method).
+		Str("path", r.URL.Path).
+		Logger()
+
+	// Log incoming request
+	requestLogger.Info().Msg("Received add request")
+
 	// Decode request body
-	var req AddRequest
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	var addRequest AddRequest
+	if err := json.NewDecoder(r.Body).Decode(&addRequest); err != nil {
+		requestLogger.Error().
+			Err(err).
+			Msg("Failed to decode request body")
+
+		response := AddResponse{
+			RequestID: requestID,
+			Error: &ErrorInfo{
+				Code:     "BAD_REQUEST",
+				Message:  "Invalid request body",
+				Severity: "ERROR",
+			},
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	// Prepare gRPC request with optional constraints
-	addRequest := &v1.AddRequest{
-		Numbers:   req.Numbers,
-		RequestId: uuid.New().String(),
+	// Prepare gRPC request
+	grpcRequest := &v1.AddRequest{
+		Numbers:   addRequest.Numbers,
+		RequestId: requestID,
 	}
 
-	// Add optional constraints if provided
-	if req.MinValue != nil || req.MaxValue != nil || req.MaxNumbers != nil {
-		addRequest.Constraints = &v1.AddRequest_Constraints{
-			MinValue:   req.MinValue,
-			MaxValue:   req.MaxValue,
-			MaxNumbers: req.MaxNumbers,
-		}
+	// Perform calculation
+	start := time.Now()
+	response, err := h.calculationClient.Add(context.Background(), grpcRequest)
+
+	// Log calculation details
+	duration := time.Since(start)
+	logFields := map[string]interface{}{
+		"request_id":     requestID,
+		"numbers_count":  len(addRequest.Numbers),
+		"duration_ms":    duration.Milliseconds(),
+		"calculation_ok": err == nil,
 	}
 
-	// Call gRPC service
-	resp, err := h.calculationClient.Add(r.Context(), addRequest)
 	if err != nil {
-		http.Error(w, "Error performing addition", http.StatusInternalServerError)
+		requestLogger.Error().
+			Err(err).
+			Fields(logFields).
+			Msg("Calculation failed")
+
+		httpResponse := AddResponse{
+			RequestID: requestID,
+			Error: &ErrorInfo{
+				Code:     "CALCULATION_ERROR",
+				Message:  err.Error(),
+				Severity: "ERROR",
+			},
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(httpResponse)
 		return
 	}
 
-	// Prepare response
-	response := AddResponse{
-		Result:    resp.Result,
-		RequestID: resp.RequestId,
+	// Log successful calculation
+	requestLogger.Info().
+		Fields(logFields).
+		Msg("Calculation completed successfully")
+
+	// Prepare HTTP response
+	httpResponse := AddResponse{
+		Result:    response.Result,
+		RequestID: requestID,
+		CalculationMetadata: &CalcMetadata{
+			CalculationTime:   duration.String(),
+			NumbersProcessed:  int32(len(addRequest.Numbers)),
+			CalculationMethod: "addition",
+		},
 	}
 
-	// Handle potential error
-	if resp.Error != nil {
-		response.Error = &ErrorInfo{
-			Code:     resp.Error.Code,
-			Message:  resp.Error.Message,
-			Severity: resp.Error.Severity.String(),
-		}
-	}
-
-	// Add calculation metadata if available
-	if resp.CalculationMetadata != nil {
-		response.CalculationMetadata = &CalcMetadata{
-			CalculationTime:   resp.CalculationMetadata.CalculationTime.AsTime().String(),
-			NumbersProcessed:  resp.CalculationMetadata.NumbersProcessed,
-			CalculationMethod: resp.CalculationMetadata.CalculationMethod,
-		}
-	}
-
-	// Send JSON response
+	// Send response
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(httpResponse)
 }
