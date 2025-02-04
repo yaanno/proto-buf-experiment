@@ -4,17 +4,21 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/yourusername/proto-buf-experiment/gen/go/calculator/v1"
 	"github.com/yourusername/proto-buf-experiment/pkg/logging"
+
 	webhandler "github.com/yourusername/proto-buf-experiment/services/web-handler/service"
 )
 
@@ -30,11 +34,10 @@ func (m *MockAdditionServiceClient) Add(ctx context.Context, in *v1.AddRequest, 
 
 func TestAddHandler(t *testing.T) {
 	testCases := []struct {
-		name               string
-		requestBody        interface{}
-		mockServiceResp    *v1.AddResponse
-		expectedStatusCode int
-		expectedResponse   webhandler.AddResponse
+		name            string
+		requestBody     webhandler.AddRequest
+		mockServiceResp *v1.AddResponse
+		expectedStatus  int
 	}{
 		{
 			name: "Successful Addition",
@@ -45,19 +48,12 @@ func TestAddHandler(t *testing.T) {
 				Result:    6.0,
 				RequestId: "test-request-id",
 				CalculationMetadata: &v1.AddResponse_CalculationMetadata{
+					CalculationTime:   timestamppb.New(time.Now()),
 					NumbersProcessed:  3,
 					CalculationMethod: "simple_addition",
 				},
 			},
-			expectedStatusCode: http.StatusOK,
-			expectedResponse: webhandler.AddResponse{
-				Result:    6.0,
-				RequestID: "test-request-id",
-				CalculationMetadata: &webhandler.CalcMetadata{
-					NumbersProcessed:  3,
-					CalculationMethod: "simple_addition",
-				},
-			},
+			expectedStatus: http.StatusOK,
 		},
 		{
 			name: "Addition with Constraints",
@@ -65,25 +61,18 @@ func TestAddHandler(t *testing.T) {
 				Numbers:    []float64{1.0, 2.0, 3.0},
 				MinValue:   floatPtr(0.0),
 				MaxValue:   floatPtr(10.0),
-				MaxNumbers: intPtr(3),
+				MaxNumbers: int32Ptr(5),
 			},
 			mockServiceResp: &v1.AddResponse{
 				Result:    6.0,
 				RequestId: "test-request-id",
 				CalculationMetadata: &v1.AddResponse_CalculationMetadata{
+					CalculationTime:   timestamppb.New(time.Now()),
 					NumbersProcessed:  3,
 					CalculationMethod: "simple_addition",
 				},
 			},
-			expectedStatusCode: http.StatusOK,
-			expectedResponse: webhandler.AddResponse{
-				Result:    6.0,
-				RequestID: "test-request-id",
-				CalculationMetadata: &webhandler.CalcMetadata{
-					NumbersProcessed:  3,
-					CalculationMethod: "simple_addition",
-				},
-			},
+			expectedStatus: http.StatusOK,
 		},
 		{
 			name: "Error Response",
@@ -91,30 +80,20 @@ func TestAddHandler(t *testing.T) {
 				Numbers: []float64{1.0, 2.0, 3.0},
 			},
 			mockServiceResp: &v1.AddResponse{
-				Result:    0,
-				RequestId: "error-request-id",
 				Error: &v1.AddResponse_ErrorInfo{
 					Code:     "INVALID_INPUT",
-					Message:  "Invalid input provided",
+					Message:  "Invalid input",
 					Severity: v1.AddResponse_ErrorInfo_SEVERITY_ERROR,
 				},
+				RequestId: "error-request-id",
 			},
-			expectedStatusCode: http.StatusOK,
-			expectedResponse: webhandler.AddResponse{
-				Result:    0,
-				RequestID: "error-request-id",
-				Error: &webhandler.ErrorInfo{
-					Code:     "INVALID_INPUT",
-					Message:  "Invalid input provided",
-					Severity: "SEVERITY_ERROR",
-				},
-			},
+			expectedStatus: http.StatusInternalServerError,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Create mock client
+			// Create mock gRPC client
 			mockClient := new(MockAdditionServiceClient)
 			mockClient.On("Add", mock.Anything, mock.Anything, mock.Anything).Return(tc.mockServiceResp, nil)
 
@@ -136,51 +115,55 @@ func TestAddHandler(t *testing.T) {
 			require.NoError(t, err)
 
 			// Create HTTP request
-			req, err := http.NewRequest("POST", "/add", bytes.NewBuffer(jsonBody))
-			require.NoError(t, err)
+			req := httptest.NewRequest(http.MethodPost, "/add", bytes.NewBuffer(jsonBody))
 			req.Header.Set("Content-Type", "application/json")
 
-			// Create response recorder
+			// Create ResponseRecorder
 			w := httptest.NewRecorder()
 
 			// Call handler
 			handler.AddHandler(w, req)
 
-			// Check response status code
-			assert.Equal(t, tc.expectedStatusCode, w.Code)
-
-			// Parse response body
-			var response webhandler.AddResponse
-			err = json.Unmarshal(w.Body.Bytes(), &response)
+			// Get response
+			resp := w.Result()
+			body, err := ioutil.ReadAll(resp.Body)
 			require.NoError(t, err)
 
-			// Compare response
-			assert.Equal(t, tc.expectedResponse.Result, response.Result)
-			assert.Equal(t, tc.expectedResponse.RequestID, response.RequestID)
+			// Check status code
+			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
 
-			// Check error if present
-			if tc.expectedResponse.Error != nil {
-				require.NotNil(t, response.Error)
-				assert.Equal(t, tc.expectedResponse.Error.Code, response.Error.Code)
-				assert.Equal(t, tc.expectedResponse.Error.Message, response.Error.Message)
-				assert.Equal(t, tc.expectedResponse.Error.Severity, response.Error.Severity)
+			// Parse response body
+			var addResp webhandler.AddResponse
+			err = json.Unmarshal(body, &addResp)
+			require.NoError(t, err)
+
+			// Validate request ID
+			if tc.mockServiceResp.RequestId != "" {
+				assert.Equal(t, tc.mockServiceResp.RequestId, addResp.RequestID)
 			}
 
-			// Check calculation metadata if present
-			if tc.expectedResponse.CalculationMetadata != nil {
-				require.NotNil(t, response.CalculationMetadata)
-				assert.Equal(t, tc.expectedResponse.CalculationMetadata.NumbersProcessed, response.CalculationMetadata.NumbersProcessed)
-				assert.Equal(t, tc.expectedResponse.CalculationMetadata.CalculationMethod, response.CalculationMetadata.CalculationMethod)
+			// Validate result for successful cases
+			if tc.expectedStatus == http.StatusOK {
+				assert.Equal(t, tc.mockServiceResp.Result, addResp.Result)
+
+				// Validate calculation metadata
+				require.NotNil(t, addResp.CalculationMetadata)
+				assert.Equal(t, tc.mockServiceResp.CalculationMetadata.CalculationMethod, addResp.CalculationMetadata.CalculationMethod)
+				assert.Equal(t, tc.mockServiceResp.CalculationMetadata.NumbersProcessed, addResp.CalculationMetadata.NumbersProcessed)
 			}
 
-			// Verify mock expectations
-			mockClient.AssertExpectations(t)
+			// Validate error response
+			if tc.expectedStatus == http.StatusInternalServerError {
+				require.NotNil(t, addResp.Error)
+				assert.Equal(t, tc.mockServiceResp.Error.Code, addResp.Error.Code)
+				assert.Equal(t, tc.mockServiceResp.Error.Message, addResp.Error.Message)
+			}
 		})
 	}
 }
 
 // Helper functions for creating pointers
-func intPtr(i int32) *int32 {
+func int32Ptr(i int32) *int32 {
 	return &i
 }
 

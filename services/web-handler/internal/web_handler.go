@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
 	v1 "github.com/yourusername/proto-buf-experiment/gen/go/calculator/v1"
@@ -58,28 +57,15 @@ func (h *WebHandler) AddHandler(w http.ResponseWriter, r *http.Request) {
 	// Set content type to JSON
 	w.Header().Set("Content-Type", "application/json")
 
-	// Generate request ID
-	requestID := uuid.New().String()
-
-	// Create request scoped logger
-	requestLogger := h.logger.With().
-		Str("request_id", requestID).
-		Str("method", r.Method).
-		Str("path", r.URL.Path).
-		Logger()
-
-	// Log incoming request
-	requestLogger.Info().Msg("Received add request")
-
 	// Decode request body
 	var addRequest AddRequest
 	if err := json.NewDecoder(r.Body).Decode(&addRequest); err != nil {
-		requestLogger.Error().
+		h.logger.Error().
 			Err(err).
 			Msg("Failed to decode request body")
 
 		response := AddResponse{
-			RequestID: requestID,
+			RequestID: "error-request-id",
 			Error: &ErrorInfo{
 				Code:     "BAD_REQUEST",
 				Message:  "Invalid request body",
@@ -93,8 +79,16 @@ func (h *WebHandler) AddHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Prepare gRPC request
 	grpcRequest := &v1.AddRequest{
-		Numbers:   addRequest.Numbers,
-		RequestId: requestID,
+		Numbers: addRequest.Numbers,
+	}
+
+	// Optional: add validation parameters
+	if addRequest.MinValue != nil || addRequest.MaxValue != nil || addRequest.MaxNumbers != nil {
+		grpcRequest.Constraints = &v1.AddRequest_Constraints{
+			MinValue:   addRequest.MinValue,
+			MaxValue:   addRequest.MaxValue,
+			MaxNumbers: addRequest.MaxNumbers,
+		}
 	}
 
 	// Perform calculation
@@ -104,24 +98,39 @@ func (h *WebHandler) AddHandler(w http.ResponseWriter, r *http.Request) {
 	// Log calculation details
 	duration := time.Since(start)
 	logFields := map[string]interface{}{
-		"request_id":     requestID,
+		"request_id":     response.RequestId,
 		"numbers_count":  len(addRequest.Numbers),
 		"duration_ms":    duration.Milliseconds(),
 		"calculation_ok": err == nil,
 	}
 
-	if err != nil {
-		requestLogger.Error().
-			Err(err).
+	// Handle gRPC error or service-level error
+	if err != nil || response.Error != nil {
+		var errorCode, errorMessage string
+		var severity string
+
+		if err != nil {
+			errorCode = "GRPC_ERROR"
+			errorMessage = err.Error()
+			severity = "ERROR"
+		} else {
+			errorCode = response.Error.Code
+			errorMessage = response.Error.Message
+			severity = response.Error.Severity.String()
+		}
+
+		h.logger.Error().
+			Str("error_code", errorCode).
+			Str("error_message", errorMessage).
 			Fields(logFields).
 			Msg("Calculation failed")
 
 		httpResponse := AddResponse{
-			RequestID: requestID,
+			RequestID: response.RequestId,
 			Error: &ErrorInfo{
-				Code:     "CALCULATION_ERROR",
-				Message:  err.Error(),
-				Severity: "ERROR",
+				Code:     errorCode,
+				Message:  errorMessage,
+				Severity: severity,
 			},
 		}
 		w.WriteHeader(http.StatusInternalServerError)
@@ -130,19 +139,23 @@ func (h *WebHandler) AddHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Log successful calculation
-	requestLogger.Info().
+	h.logger.Info().
 		Fields(logFields).
 		Msg("Calculation completed successfully")
 
 	// Prepare HTTP response
 	httpResponse := AddResponse{
 		Result:    response.Result,
-		RequestID: requestID,
-		CalculationMetadata: &CalcMetadata{
-			CalculationTime:   duration.String(),
-			NumbersProcessed:  int32(len(addRequest.Numbers)),
-			CalculationMethod: "addition",
-		},
+		RequestID: response.RequestId,
+	}
+
+	// Add calculation metadata if available
+	if response.CalculationMetadata != nil {
+		httpResponse.CalculationMetadata = &CalcMetadata{
+			CalculationTime:   response.CalculationMetadata.CalculationTime.AsTime().String(),
+			NumbersProcessed:  response.CalculationMetadata.NumbersProcessed,
+			CalculationMethod: response.CalculationMetadata.CalculationMethod,
+		}
 	}
 
 	// Send response
