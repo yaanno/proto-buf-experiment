@@ -1,11 +1,9 @@
 package main
 
 import (
-	"context"
 	"log"
 	"net"
 
-	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
