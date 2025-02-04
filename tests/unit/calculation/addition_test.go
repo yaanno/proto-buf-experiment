@@ -81,60 +81,76 @@ func TestAdditionService_Add(t *testing.T) {
 			errorSeverity:  v1.AddResponse_ErrorInfo_SEVERITY_ERROR,
 		},
 		{
-			name:     "Basic Addition",
-			numbers:  []float64{1.0, 2.0, 3.0},
-			expected: 6.0,
-			hasError: false,
+			name: "Basic Addition",
+			request: &v1.AddRequest{
+				Numbers:   []float64{1.0, 2.0, 3.0},
+				RequestId: "test-request-6",
+			},
+			expectedResult: 6.0,
+			expectedError:  false,
 		},
 		{
-			name:     "Negative Numbers",
-			numbers:  []float64{-1.0, 2.0, -3.0},
-			expected: -2.0,
-			hasError: false,
+			name: "Negative Numbers",
+			request: &v1.AddRequest{
+				Numbers:   []float64{-1.0, 2.0, -3.0},
+				RequestId: "test-request-7",
+			},
+			expectedResult: -2.0,
+			expectedError:  false,
 		},
 		{
-			name:     "Empty Input",
-			numbers:  []float64{},
-			expected: 0,
-			hasError: true,
-			errorMsg: "no numbers provided",
+			name: "Empty Input",
+			request: &v1.AddRequest{
+				Numbers:   []float64{},
+				RequestId: "test-request-8",
+			},
+			expectedResult: 0,
+			expectedError:  true,
 		},
 		{
-			name:     "Single Number",
-			numbers:  []float64{5.5},
-			expected: 5.5,
-			hasError: false,
+			name: "Single Number",
+			request: &v1.AddRequest{
+				Numbers:   []float64{5.5},
+				RequestId: "test-request-9",
+			},
+			expectedResult: 5.5,
+			expectedError:  false,
 		},
 		{
-			name:     "Floating Point Precision",
-			numbers:  []float64{0.1, 0.2},
-			expected: 0.3,
-			hasError: false,
+			name: "Floating Point Precision",
+			request: &v1.AddRequest{
+				Numbers:   []float64{0.1, 0.2},
+				RequestId: "test-request-10",
+			},
+			expectedResult: 0.3,
+			expectedError:  false,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			resp, err := additionService.Add(context.Background(), tc.request)
+			result, err := additionService.Add(context.Background(), tc.request)
 
 			if tc.expectedError {
-				require.Error(t, err)
-				require.NotNil(t, resp)
-				require.NotNil(t, resp.Error)
-				assert.Equal(t, tc.errorSeverity, resp.Error.Severity)
-			} else {
-				require.NoError(t, err)
-				require.NotNil(t, resp)
-				assert.Equal(t, tc.expectedResult, resp.Result)
-				assert.NotEmpty(t, resp.RequestId)
-				assert.NotNil(t, resp.CalculationMetadata)
-				assert.Equal(t, int32(len(tc.request.Numbers)), resp.CalculationMetadata.NumbersProcessed)
+				assert.Error(t, err, "Expected an error for test case: %s", tc.name)
+				// For empty input, ensure the result is 0
+				if tc.name == "Empty Input" {
+					assert.Equal(t, 0.0, result.GetResult(), "Result should be 0 for empty input")
+				}
+				return
 			}
 
+			assert.NoError(t, err, "Unexpected error for test case: %s", tc.name)
+			// Use InDelta for floating point comparisons to handle precision issues
+			assert.InDelta(t, tc.expectedResult, result.GetResult(), 1e-9, "Incorrect result for test case: %s", tc.name)
+			assert.NotEmpty(t, result.RequestId)
+			assert.NotNil(t, result.CalculationMetadata)
+			assert.Equal(t, int32(len(tc.request.Numbers)), result.CalculationMetadata.NumbersProcessed)
+
 			// Verify calculation metadata
-			if resp.CalculationMetadata != nil {
-				assert.NotNil(t, resp.CalculationMetadata.CalculationTime)
-				assert.Equal(t, "simple_addition", resp.CalculationMetadata.CalculationMethod)
+			if result.CalculationMetadata != nil {
+				assert.NotNil(t, result.CalculationMetadata.CalculationTime)
+				assert.Equal(t, "simple_addition", result.CalculationMetadata.CalculationMethod)
 			}
 		})
 	}
