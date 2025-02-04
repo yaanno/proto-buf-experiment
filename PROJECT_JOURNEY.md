@@ -193,5 +193,52 @@ go mod verify
 4. Regularly update dependencies
 5. Use `buf generate` to keep generated code in sync with proto definitions
 
+### Endpoint Testing with Curl
+
+#### Basic Addition
+```bash
+# Simple addition of two numbers
+curl -X POST http://localhost:8080/add \
+     -H "Content-Type: application/json" \
+     -d '{"numbers": [5.5, 3.7]}'
+```
+
+#### Multiple Number Addition
+```bash
+# Addition of multiple numbers
+curl -X POST http://localhost:8080/add \
+     -H "Content-Type: application/json" \
+     -d '{"numbers": [1.0, 2.0, 3.0, 4.0, 5.0]}'
+```
+
+#### Error Handling Test
+```bash
+# Empty numbers array (should return an error)
+curl -X POST http://localhost:8080/add \
+     -H "Content-Type: application/json" \
+     -d '{"numbers": []}'
+```
+
+#### Expected Response Formats
+- **Successful Response**:
+  ```json
+  {
+    "result": 9.2,
+    "request_id": "unique-uuid",
+    "error": ""
+  }
+  ```
+
+- **Error Response**:
+  ```json
+  {
+    "result": 0,
+    "request_id": "unique-uuid",
+    "error": "no numbers provided"
+  }
+  ```
+
+**Note**: Ensure the web handler service is running on `localhost:8080` before testing.
+
 ## Conclusion
 A learning-focused, well-structured microservice demonstrating modern Go and gRPC practices.
