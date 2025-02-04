@@ -4,18 +4,18 @@ import (
 	"encoding/json"
 	"net/http"
 
-	pb "github.com/yourusername/proto-buf-experiment/gen/go/calculator/v1"
+	v1 "github.com/yourusername/proto-buf-experiment/gen/go/calculator/v1"
 )
 
 type WebHandler struct {
-	calculationClient pb.AdditionServiceClient
+	calculationClient v1.AdditionServiceClient
 }
 
 type AddRequest struct {
 	Numbers []float64 `json:"numbers"`
 }
 
-func NewWebHandler(calculationClient pb.AdditionServiceClient) *WebHandler {
+func NewWebHandler(calculationClient v1.AdditionServiceClient) *WebHandler {
 	return &WebHandler{
 		calculationClient: calculationClient,
 	}
@@ -33,15 +33,10 @@ func (h *WebHandler) AddHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate input
-	if len(req.Numbers) < 2 {
-		http.Error(w, "At least two numbers are required", http.StatusBadRequest)
-		return
-	}
-
 	// Prepare gRPC request
-	addRequest := &pb.AddRequest{
-		Numbers: req.Numbers,
+	addRequest := &v1.AddRequest{
+		Numbers:    req.Numbers,
+		RequestId: "web-request-id",
 	}
 
 	// Call gRPC service
@@ -55,8 +50,10 @@ func (h *WebHandler) AddHandler(w http.ResponseWriter, r *http.Request) {
 	response := map[string]interface{}{
 		"result":     resp.Result,
 		"request_id": resp.RequestId,
+		"error":      resp.Error,
 	}
 
 	// Send JSON response
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
 }

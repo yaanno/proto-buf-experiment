@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc"
 
-	pb "github.com/yourusername/proto-buf-experiment/gen/go/calculator/v1"
+	v1 "github.com/yourusername/proto-buf-experiment/gen/go/calculator/v1"
 	webhandler "github.com/yourusername/proto-buf-experiment/services/web-handler/service"
 )
 
@@ -21,9 +21,9 @@ type MockCalculationClient struct {
 	mock.Mock
 }
 
-func (m *MockCalculationClient) Add(ctx context.Context, in *pb.AddRequest, opts ...grpc.CallOption) (*pb.AddResponse, error) {
+func (m *MockCalculationClient) Add(ctx context.Context, in *v1.AddRequest, opts ...grpc.CallOption) (*v1.AddResponse, error) {
 	args := m.Called(ctx, in, opts)
-	return args.Get(0).(*pb.AddResponse), args.Error(1)
+	return args.Get(0).(*v1.AddResponse), args.Error(1)
 }
 
 func TestAddHandler_SuccessfulAddition(t *testing.T) {
@@ -37,7 +37,7 @@ func TestAddHandler_SuccessfulAddition(t *testing.T) {
 
 	// Setup mock expectation
 	mockClient.On("Add", mock.Anything, mock.Anything, mock.Anything).
-		Return(&pb.AddResponse{
+		Return(&v1.AddResponse{
 			Result:    expectedResult,
 			RequestId: expectedRequestID,
 			Error:     "",
@@ -82,13 +82,13 @@ func TestAddHandler_ErrorHandling(t *testing.T) {
 	testCases := []struct {
 		name               string
 		requestBody        []float64
-		mockServerResponse *pb.AddResponse
+		mockServerResponse *v1.AddResponse
 		expectedStatusCode int
 	}{
 		{
 			name:        "Empty Input",
 			requestBody: []float64{},
-			mockServerResponse: &pb.AddResponse{
+			mockServerResponse: &v1.AddResponse{
 				Result:    0,
 				Error:     "no numbers provided",
 				RequestId: "error-request-id",
