@@ -3,16 +3,54 @@ package performancetest
 import (
 	"context"
 	"log"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
 	v1 "github.com/yourusername/proto-buf-experiment/gen/go/calculator/v1"
 )
+
+func TestClientConnection(t *testing.T) {
+	// Connection timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Establish gRPC connection
+	conn, err := grpc.DialContext(ctx,
+		"localhost:50051",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(), // Block until connection is established or timeout
+	)
+	require.NoError(t, err, "Failed to connect to gRPC server")
+	defer conn.Close()
+
+	// Create client
+	client := v1.NewAdditionServiceClient(conn)
+
+	// Prepare a simple addition request
+	req := &v1.AddRequest{
+		Numbers:   []float64{1.0, 2.0, 3.0},
+		RequestId: "connection-test-request",
+	}
+
+	// Attempt to make a request
+	resp, err := client.Add(ctx, req)
+	
+	// Assert no error and valid response
+	assert.NoError(t, err, "Failed to make addition request")
+	assert.NotNil(t, resp, "Response should not be nil")
+	
+	// Log the result for debugging
+	if resp != nil {
+		log.Printf("Connection Test Result: %v", resp.GetResult())
+	}
+}
 
 func TestPerformance_ConcurrentAdditions(t *testing.T) {
 	// Performance test configurations
@@ -26,6 +64,7 @@ func TestPerformance_ConcurrentAdditions(t *testing.T) {
 	conn, err := grpc.DialContext(ctx,
 		"localhost:50051",
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(), // Block until connection is established or timeout
 	)
 	assert.NoError(t, err)
 	defer conn.Close()
@@ -46,7 +85,7 @@ func TestPerformance_ConcurrentAdditions(t *testing.T) {
 
 			req := &v1.AddRequest{
 				Numbers:   []float64{float64(requestNum), 1.0, 2.0},
-				RequestId: "perf-test-" + string(rune(requestNum)),
+				RequestId: "perf-test-" + strconv.Itoa(requestNum),
 			}
 
 			resp, err := client.Add(ctx, req)
