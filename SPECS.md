@@ -386,53 +386,64 @@ type CalculationServiceConfig struct {
 }
 ```
 
-## 4. Protocol Buffer Definitions
-### Detailed Message Specifications
+## 3. Protocol Buffer Definitions
+
+### 3.1 Addition Service Proto
 ```protobuf
 syntax = "proto3";
 
-enum OperationType {
-    UNSPECIFIED = 0;
-    ADD = 1;
+package calculator.v1;
+
+service AdditionService {
+  // RPC method for addition with explicit result return
+  rpc Add(AddRequest) returns (AddResponse) {
+    option (google.api.http) = {
+      post: "/v1/calculator/add"
+      body: "*"
+    };
+  }
 }
 
-message CalculationMetadata {
-    string request_id = 1;
-    google.protobuf.Timestamp timestamp = 2;
-    string client_ip = 3;
+message AddRequest {
+  // Unique request identifier for tracing
+  string request_id = 1;
+  
+  // Numbers to be added
+  repeated double numbers = 2;
 }
 
-message CalculationRequest {
-    OperationType operation = 1;
-    repeated double numbers = 2;
-    CalculationMetadata metadata = 3;
-}
-
-message CalculationResponse {
-    double result = 1;
-    string error_message = 2;
-    OperationType operation = 3;
-    CalculationMetadata metadata = 4;
+message AddResponse {
+  // Calculation result
+  double result = 1;
+  
+  // Optional error message
+  string error = 2;
+  
+  // Request identifier for correlation
+  string request_id = 3;
 }
 ```
 
-## 5. Error Handling Taxonomy
-### Error Categories
-1. **Input Validation Errors**
-   - Invalid number of arguments
-   - Non-numeric inputs
-   - Out-of-range values
+### 3.2 Service Interaction Flow
+1. Web Handler creates `AddRequest` with:
+   - Unique `request_id`
+   - List of numbers to add
+2. Calculation Service processes request
+3. Calculation Service returns `AddResponse` containing:
+   - Calculation `result`
+   - Optional `error`
+   - Original `request_id`
+4. Web Handler uses returned result for HTTP response
 
-2. **Operational Errors**
-   - Overflow/underflow
-   - Unsupported operation
+## 4. Error Handling
 
-3. **System Errors**
-   - gRPC connection failures
-   - Timeout exceptions
-   - Resource exhaustion
+### 4.1 Error Categories
+- Input validation errors
+- Calculation overflow
+- Type conversion errors
+- Request-response correlation errors
 
-### Error Code Schema
+### 4.2 Error Codes
 ```go
 type ErrorCode int
 
@@ -440,12 +451,17 @@ const (
     ErrOK ErrorCode = iota
     ErrInvalidInput
     ErrOverflow
-    ErrUnsupportedOperation
-    ErrSystemFailure
+    ErrRequestCorrelation
 )
 ```
 
-## 6. Performance Benchmarks
+### 4.3 Error Handling Strategy
+- Each request has a unique identifier
+- Errors include descriptive messages
+- Errors propagated back to web handler
+- Web handler responsible for converting gRPC errors to HTTP errors
+
+## 5. Performance Benchmarks
 ### Benchmark Scenarios
 - Single operation latency
 - Memory consumption
@@ -457,13 +473,13 @@ const (
 - **Memory**: 
   - < 30MB per service instance
 
-## 7. Security Specifications
+## 6. Security Specifications
 ### Input Validation
 - Strict type checking
 - Limit maximum number of input values
 - Sanitize and validate all inputs
 
-## 8. Logging Specifications
+## 7. Logging Specifications
 ### Log Levels
 - `DEBUG`: Detailed execution flow
 - `INFO`: Operational milestones
@@ -486,7 +502,7 @@ type LogEntry struct {
 }
 ```
 
-## 9. Deployment Considerations
+## 8. Deployment Considerations
 ### Container Specifications
 - Alpine Linux base image
 - Minimal runtime dependencies
@@ -498,7 +514,7 @@ type LogEntry struct {
 - Horizontal Pod Autoscaler configuration
 - Readiness and liveness probes
 
-## 10. Development Workflow
+## 9. Development Workflow
 ### Git Workflow
 - Feature branch model
 - Conventional commit messages
@@ -511,18 +527,18 @@ type LogEntry struct {
 - Passing integration tests
 - Performance benchmark comparisons
 
-## 11. Versioning Strategy
+## 10. Versioning Strategy
 - Semantic Versioning (SemVer)
 - Backward compatibility preservation
 - Clear deprecation policies
 
-## 12. Future Extension Points
+## 11. Future Extension Points
 - Support for complex mathematical functions
 - Machine learning model integration
 - Streaming calculation support
 - Multi-language client libraries
 
-## 13. Buf Integration Strategy
+## 12. Buf Integration Strategy
 
 ### Buf Configuration Philosophy
 - Centralized proto definition management
