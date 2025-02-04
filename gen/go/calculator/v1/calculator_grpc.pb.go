@@ -26,7 +26,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AdditionServiceClient interface {
-	// Add numbers and return the sum
+	// Add numbers and return the sum with enhanced metadata
 	Add(ctx context.Context, in *AddRequest, opts ...grpc.CallOption) (*AddResponse, error)
 }
 
@@ -52,7 +52,7 @@ func (c *additionServiceClient) Add(ctx context.Context, in *AddRequest, opts ..
 // All implementations must embed UnimplementedAdditionServiceServer
 // for forward compatibility.
 type AdditionServiceServer interface {
-	// Add numbers and return the sum
+	// Add numbers and return the sum with enhanced metadata
 	Add(context.Context, *AddRequest) (*AddResponse, error)
 	mustEmbedUnimplementedAdditionServiceServer()
 }

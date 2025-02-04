@@ -2,28 +2,81 @@ syntax = "proto3";
 
 package calculator.v1;
 
+import "google/protobuf/timestamp.proto";
+
 option go_package = "github.com/yourusername/proto-buf-experiment/gen/calculator/v1";
 
 service AdditionService {
-  // Add numbers and return the sum
+  // Add numbers and return the sum with enhanced metadata
   rpc Add(AddRequest) returns (AddResponse) {}
 }
 
 message AddRequest {
-  // Unique identifier for the request
+  // Unique identifier for the request (can be client or server generated)
   string request_id = 1;
   
   // Numbers to be added
   repeated double numbers = 2;
+  
+  // Optional validation constraints
+  message Constraints {
+    // Minimum allowed value for numbers
+    optional double min_value = 1;
+    
+    // Maximum allowed value for numbers
+    optional double max_value = 2;
+    
+    // Maximum number of numbers allowed in a single request
+    optional int32 max_numbers = 3;
+  }
+  
+  // Optional constraints for input validation
+  optional Constraints constraints = 3;
+  
+  // Timestamp of the request
+  google.protobuf.Timestamp request_time = 4;
 }
 
 message AddResponse {
   // Calculation result
   double result = 1;
   
-  // Optional error message
-  string error = 2;
+  // Optional error message with more context
+  message ErrorInfo {
+    // Error code for programmatic handling
+    string code = 1;
+    
+    // Human-readable error message
+    string message = 2;
+    
+    // Error severity
+    enum Severity {
+      SEVERITY_INFO_UNSPECIFIED = 0;
+      SEVERITY_WARNING = 1;
+      SEVERITY_ERROR = 2;
+      SEVERITY_CRITICAL = 3;
+    }
+    Severity severity = 3;
+  }
+  
+  // Optional error details
+  optional ErrorInfo error = 2;
   
   // Original request ID for correlation
   string request_id = 3;
+  
+  // Metadata about the calculation
+  message CalculationMetadata {
+    // Timestamp of the calculation
+    google.protobuf.Timestamp calculation_time = 1;
+    
+    // Number of operands processed
+    int32 numbers_processed = 2;
+    
+    // Calculation method or algorithm used
+    string calculation_method = 3;
+  }
+  
+  // Additional calculation metadata
+  optional CalculationMetadata calculation_metadata = 4;
 }
