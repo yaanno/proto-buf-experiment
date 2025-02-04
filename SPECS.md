@@ -211,132 +211,150 @@ message ErrorDetails {
 
 ## 2. Development Tools and Workflow
 
-### Buf Ecosystem Toolchain
+### Buf v2 Ecosystem Toolchain
 
-#### Core Tools
-- **Buf CLI**: Primary proto management and code generation tool
-  - Version: Latest stable release
-  - Key Capabilities:
-    - Proto linting
-    - Breaking change detection
-    - Code generation
-    - Schema registry management
+#### Buf v2 Key Differences
+- Enhanced configuration model
+- Improved plugin management
+- More granular lint and breaking change rules
+- Better monorepo and multi-module support
 
-#### Development Workflow with Buf
+#### Buf v2 Configuration Files
 
-##### Proto Management
+##### `buf.work.yaml` (Workspace Configuration)
+```yaml
+version: v2
+directories:
+  - proto
+  - services
+```
+
+##### `buf.yaml` (Module Configuration)
+```yaml
+version: v2
+name: buf.build/yourusername/proto-buf-experiment
+
+# V2 Lint Configuration
+lint:
+  # Default ruleset with custom exceptions
+  use:
+    - BASIC
+    - FILE_LOWER_SNAKE_CASE
+    - PACKAGE_LOWER_SNAKE_CASE
+    - ENUM_PASCAL_CASE
+  except:
+    - FIELD_LOWER_SNAKE_CASE  # Allow more flexible naming
+
+# V2 Breaking Change Detection
+breaking:
+  use:
+    - FILE
+    - PACKAGE
+    - WIRE_JSON
+  ignore_unstable_packages: true
+```
+
+##### `buf.gen.yaml` (Code Generation Configuration)
+```yaml
+version: v2
+managed:
+  enabled: true
+  go_package_prefix:
+    default: github.com/yourusername/proto-buf-experiment/gen
+
+plugins:
+  # Go code generation
+  - name: go
+    out: gen/go
+    opt:
+      - paths=source_relative
+      - go_opt=paths=source_relative
+  
+  # gRPC Go plugin
+  - name: go-grpc
+    out: gen/go
+    opt:
+      - paths=source_relative
+  
+  # Optional: Connect RPC support
+  - name: connect-go
+    out: gen/go
+    opt:
+      - paths=source_relative
+```
+
+#### Buf v2 Development Workflow
+
+##### Proto Management Commands
 ```bash
-# Initialize buf project
-buf new proto
+# Initialize a new Buf module
+buf mod init
 
-# Lint proto files
+# Lint with v2 configuration
 buf lint
 
 # Format proto files
 buf format -w
 
-# Breaking change detection
+# Check for breaking changes
 buf breaking --against .git#branch=main
-```
 
-##### Code Generation
-```bash
-# Generate code for all configured languages
+# Generate code with v2 configuration
 buf generate
 
-# Generate specific language targets
-buf generate --template buf.gen.go.yaml
-buf generate --template buf.gen.python.yaml
+# Validate module configuration
+buf mod update
 ```
 
-##### Configuration Files
-
-###### `buf.yaml` (Workspace Configuration)
-```yaml
-version: v1
-name: github.com/yourusername/proto-buf-experiment
-deps:
-  - buf.build/googleapis/googleapis
-lint:
-  use:
-    - DEFAULT
-  except:
-    - PACKAGE_VERSION_SUFFIX
-breaking:
-  use:
-    - FILE
-    - PACKAGE
-```
-
-###### `buf.gen.yaml` (Code Generation Configuration)
-```yaml
-version: v1
-managed:
-  enabled: true
-plugins:
-  - plugin: buf.build/protocolbuffers/go
-    out: gen/go
-    opt: 
-      - paths=source_relative
-  - plugin: buf.build/grpc/go
-    out: gen/go
-    opt:
-      - paths=source_relative
-  - plugin: buf.build/protocolbuffers/python
-    out: gen/python
-  - plugin: buf.build/grpc/python
-    out: gen/python
-```
-
-#### Supplementary Development Tools
-
-##### Go Toolchain
-- **Go**: 1.21+
-- **go mod**: Dependency management
-- **go vet**: Static analysis
-- **golangci-lint**: Advanced linting
-
-##### Testing and Validation
-- **go test**: Unit and integration testing
-- **testify**: Advanced testing assertions
-- **mockgen**: Mock generation for testing
-
-##### CI/CD Integration
-- GitHub Actions compatible
-- Buf CLI integrated checks
-- Automatic code generation
-- Compatibility and lint validation
-
-### Development Practices
+### Buf v2 Best Practices
 
 #### Proto Design Principles
-1. Use `snake_case` for field names
-2. Add clear, concise comments
-3. Prefer optional fields for extensibility
-4. Use semantic versioning in package names
+1. Use `lower_snake_case` for package and file names
+2. Use `PascalCase` for message and enum names
+3. Use `lower_snake_case` for field names
+4. Add clear, concise comments
+5. Prefer optional fields for extensibility
 
 #### Code Generation Workflow
-1. Define proto contracts
+1. Define proto contracts in `proto/` directory
 2. Run `buf lint` for validation
 3. Run `buf generate` for code generation
 4. Implement service logic in generated interfaces
 5. Write tests against generated code
 
-#### Version Control
+#### Version Control Considerations
 - Commit generated code
 - Use `.gitignore` to manage generated files
 - Tag releases with semantic versioning
+- Include `buf.lock` for dependency locking
 
-### Buf Schema Registry (Optional)
-- Push schemas to Buf Schema Registry
-- Manage proto dependencies
-- Share and discover schemas
-- Integrate with CI/CD
+### Advanced Buf v2 Features
 
-### Troubleshooting
-- Use `buf debug` for configuration issues
-- Check Buf documentation for advanced usage
-- Join Buf community for support
+#### Dependency Management
+- Use `buf.lock` for exact dependency pinning
+- Support for local and remote proto module dependencies
+- Integrated dependency resolution
+
+#### Plugin Management
+- More flexible plugin configuration
+- Support for custom plugins
+- Easy integration with existing toolchains
+
+#### Schema Registry Integration
+- Improved Buf Schema Registry support
+- Push and pull schemas with enhanced metadata
+- Version tracking and discovery
+
+### Troubleshooting and Support
+- Use `buf debug` for configuration insights
+- Consult Buf v2 migration guide
+- Join Buf community channels
+- Reference official Buf documentation
+
+### Future Improvements
+- Explore Connect RPC integration
+- Investigate multi-language generation
+- Continuous learning of Buf v2 features
 
 ## 3. Detailed Service Specifications
 
@@ -541,8 +559,8 @@ proto-buf-experiment/
 
 #### `buf.yaml` (Workspace Configuration)
 ```yaml
-version: v1
-name: github.com/yourusername/proto-buf-experiment
+version: v2
+name: buf.build/yourusername/proto-buf-experiment
 deps:
   - buf.build/googleapis/googleapis
 lint:
@@ -558,7 +576,7 @@ breaking:
 
 #### `buf.gen.yaml` (Code Generation Configuration)
 ```yaml
-version: v1
+version: v2
 managed:
   enabled: true
 plugins:
@@ -578,7 +596,7 @@ plugins:
 
 #### `buf.work.yaml` (Monorepo Workspace)
 ```yaml
-version: v1
+version: v2
 directories:
   - proto
 ```
