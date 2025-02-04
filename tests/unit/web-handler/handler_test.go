@@ -13,7 +13,7 @@ import (
 	"google.golang.org/grpc"
 
 	pb "github.com/yourusername/proto-buf-experiment/gen/go/calculator/v1"
-	webhandler "github.com/yourusername/proto-buf-experiment/services/web-handler/internal"
+	webhandler "github.com/yourusername/proto-buf-experiment/services/web-handler/service"
 )
 
 // MockCalculationClient is a mock type for the AdditionServiceClient
