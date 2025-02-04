@@ -71,6 +71,34 @@ tasks:
              -H "Content-Type: application/json" \
              -d '{"numbers": []}'
 
+  test:
+    desc: Run all tests
+    cmds:
+      - go test ./tests/unit/...
+      - go test ./tests/integration/...
+      - go test ./tests/performance/...
+
+  test:unit:
+    desc: Run unit tests
+    cmds:
+      - go test ./tests/unit/...
+
+  test:integration:
+    desc: Run integration tests
+    cmds:
+      - go test ./tests/integration/...
+
+  test:performance:
+    desc: Run performance tests
+    cmds:
+      - go test -v ./tests/performance/...
+
+  test:coverage:
+    desc: Generate test coverage report
+    cmds:
+      - go test -coverprofile=coverage.out ./...
+      - go tool cover -html=coverage.out -o coverage.html
+
   clean:
     desc: Clean generated files and caches
     cmds:
