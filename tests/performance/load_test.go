@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	pb "github.com/yourusername/proto-buf-experiment/gen/go/calculator/v1"
+	v1 "github.com/yourusername/proto-buf-experiment/gen/go/calculator/v1"
 )
 
 func TestPerformance_ConcurrentAdditions(t *testing.T) {
@@ -23,18 +23,18 @@ func TestPerformance_ConcurrentAdditions(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	conn, err := grpc.DialContext(ctx, 
-		"localhost:50051", 
+	conn, err := grpc.DialContext(ctx,
+		"localhost:50051",
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	assert.NoError(t, err)
 	defer conn.Close()
 
-	client := pb.NewAdditionServiceClient(conn)
+	client := v1.NewAdditionServiceClient(conn)
 
 	// Performance test
 	var wg sync.WaitGroup
-	results := make(chan *pb.AddResponse, concurrentRequests)
+	results := make(chan *v1.AddResponse, concurrentRequests)
 	errors := make(chan error, concurrentRequests)
 
 	startTime := time.Now()
@@ -44,8 +44,8 @@ func TestPerformance_ConcurrentAdditions(t *testing.T) {
 		go func(requestNum int) {
 			defer wg.Done()
 
-			req := &pb.AddRequest{
-				Numbers:    []float64{float64(requestNum), 1.0, 2.0},
+			req := &v1.AddRequest{
+				Numbers:   []float64{float64(requestNum), 1.0, 2.0},
 				RequestId: "perf-test-" + string(rune(requestNum)),
 			}
 
@@ -82,19 +82,19 @@ func TestPerformance_ConcurrentAdditions(t *testing.T) {
 
 func BenchmarkAdditionService_ConcurrentLoad(b *testing.B) {
 	conn, err := grpc.Dial(
-		"localhost:50051", 
+		"localhost:50051",
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	assert.NoError(b, err)
 	defer conn.Close()
 
-	client := pb.NewAdditionServiceClient(conn)
+	client := v1.NewAdditionServiceClient(conn)
 
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			req := &pb.AddRequest{
-				Numbers:    []float64{1.0, 2.0, 3.0},
+			req := &v1.AddRequest{
+				Numbers:   []float64{1.0, 2.0, 3.0},
 				RequestId: "bench-request",
 			}
 
