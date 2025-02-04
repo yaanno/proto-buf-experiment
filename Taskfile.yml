@@ -1,0 +1,78 @@
+version: '3'
+
+vars:
+  CALCULATION_SERVICE_PORT: 50051
+  WEB_HANDLER_PORT: 8080
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  proto:generate:
+    desc: Generate Go code from proto definitions
+    cmds:
+      - buf generate
+
+  deps:update:
+    desc: Update Go dependencies
+    cmds:
+      - go mod tidy
+      - go mod verify
+
+  lint:
+    desc: Run linters and static analysis
+    cmds:
+      - buf lint
+      - go vet ./...
+
+  services:start:
+    desc: Start calculation and web handler services
+    deps: [proto:generate]
+    cmds:
+      - |
+        trap 'kill $(jobs -p)' EXIT
+        go run services/calculation/cmd/main.go & 
+        go run services/web-handler/cmd/main.go &
+        wait
+
+  services:calculation:start:
+    desc: Start only calculation service
+    cmds:
+      - go run services/calculation/cmd/main.go
+
+  services:web-handler:start:
+    desc: Start only web handler service
+    cmds:
+      - go run services/web-handler/cmd/main.go
+
+  test:curl:basic:
+    desc: Test basic addition endpoint
+    cmds:
+      - |
+        curl -X POST http://localhost:{{.WEB_HANDLER_PORT}}/add \
+             -H "Content-Type: application/json" \
+             -d '{"numbers": [5.5, 3.7]}'
+
+  test:curl:multiple:
+    desc: Test multiple number addition
+    cmds:
+      - |
+        curl -X POST http://localhost:{{.WEB_HANDLER_PORT}}/add \
+             -H "Content-Type: application/json" \
+             -d '{"numbers": [1.0, 2.0, 3.0, 4.0, 5.0]}'
+
+  test:curl:error:
+    desc: Test error handling
+    cmds:
+      - |
+        curl -X POST http://localhost:{{.WEB_HANDLER_PORT}}/add \
+             -H "Content-Type: application/json" \
+             -d '{"numbers": []}'
+
+  clean:
+    desc: Clean generated files and caches
+    cmds:
+      - rm -rf gen/
+      - go clean ./...
