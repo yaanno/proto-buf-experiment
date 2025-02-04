@@ -1,8 +1,8 @@
-version: v2
+version: v1
 name: buf.build/yourusername/calculator
 lint:
   use:
-    - DEFAULT
+    - STANDARD
 breaking:
   use:
     - FILE
