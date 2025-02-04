@@ -1,23 +1,85 @@
-package calculationtest
+package calculation
 
 import (
 	"context"
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	v1 "github.com/yourusername/proto-buf-experiment/gen/go/calculator/v1"
 	"github.com/yourusername/proto-buf-experiment/services/calculation/service"
 )
 
 func TestAdditionService_Add(t *testing.T) {
+	additionService := service.NewAdditionService()
+
 	testCases := []struct {
-		name     string
-		numbers  []float64
-		expected float64
-		hasError bool
-		errorMsg string
+		name           string
+		request        *v1.AddRequest
+		expectedResult float64
+		expectedError  bool
+		errorSeverity  v1.AddResponse_ErrorInfo_Severity
 	}{
+		{
+			name: "Basic addition",
+			request: &v1.AddRequest{
+				Numbers:   []float64{1.0, 2.0, 3.0},
+				RequestId: "test-request-1",
+			},
+			expectedResult: 6.0,
+			expectedError:  false,
+		},
+		{
+			name: "Empty input",
+			request: &v1.AddRequest{
+				Numbers:   []float64{},
+				RequestId: "test-request-2",
+			},
+			expectedResult: 0,
+			expectedError:  true,
+			errorSeverity:  v1.AddResponse_ErrorInfo_SEVERITY_WARNING,
+		},
+		{
+			name: "Constraints - Max Numbers",
+			request: &v1.AddRequest{
+				Numbers:   []float64{1.0, 2.0, 3.0, 4.0},
+				RequestId: "test-request-3",
+				Constraints: &v1.AddRequest_Constraints{
+					MaxNumbers: intPtr(3),
+				},
+			},
+			expectedResult: 0,
+			expectedError:  true,
+			errorSeverity:  v1.AddResponse_ErrorInfo_SEVERITY_WARNING,
+		},
+		{
+			name: "Constraints - Min Value",
+			request: &v1.AddRequest{
+				Numbers:   []float64{1.0, 2.0, -3.0},
+				RequestId: "test-request-4",
+				Constraints: &v1.AddRequest_Constraints{
+					MinValue: floatPtr(0.0),
+				},
+			},
+			expectedResult: 0,
+			expectedError:  true,
+			errorSeverity:  v1.AddResponse_ErrorInfo_SEVERITY_ERROR,
+		},
+		{
+			name: "Constraints - Max Value",
+			request: &v1.AddRequest{
+				Numbers:   []float64{1.0, 2.0, 100.0},
+				RequestId: "test-request-5",
+				Constraints: &v1.AddRequest_Constraints{
+					MaxValue: floatPtr(10.0),
+				},
+			},
+			expectedResult: 0,
+			expectedError:  true,
+			errorSeverity:  v1.AddResponse_ErrorInfo_SEVERITY_ERROR,
+		},
 		{
 			name:     "Basic Addition",
 			numbers:  []float64{1.0, 2.0, 3.0},
@@ -51,29 +113,62 @@ func TestAdditionService_Add(t *testing.T) {
 		},
 	}
 
-	calculationService := service.NewAdditionService()
-
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			req := &v1.AddRequest{
-				Numbers:   tc.numbers,
-				RequestId: "test-request-id",
+			resp, err := additionService.Add(context.Background(), tc.request)
+
+			if tc.expectedError {
+				require.Error(t, err)
+				require.NotNil(t, resp)
+				require.NotNil(t, resp.Error)
+				assert.Equal(t, tc.errorSeverity, resp.Error.Severity)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, resp)
+				assert.Equal(t, tc.expectedResult, resp.Result)
+				assert.NotEmpty(t, resp.RequestId)
+				assert.NotNil(t, resp.CalculationMetadata)
+				assert.Equal(t, int32(len(tc.request.Numbers)), resp.CalculationMetadata.NumbersProcessed)
 			}
 
-			resp, err := calculationService.Add(context.Background(), req)
-
-			if tc.hasError {
-				assert.Error(t, err)
-				assert.Contains(t, resp.Error, tc.errorMsg)
-				assert.Equal(t, float64(0), resp.Result)
-			} else {
-				assert.NoError(t, err)
-				assert.InDelta(t, tc.expected, resp.Result, 1e-9, "Result should match expected value")
-				assert.Equal(t, "test-request-id", resp.RequestId)
-				assert.Empty(t, resp.Error)
+			// Verify calculation metadata
+			if resp.CalculationMetadata != nil {
+				assert.NotNil(t, resp.CalculationMetadata.CalculationTime)
+				assert.Equal(t, "simple_addition", resp.CalculationMetadata.CalculationMethod)
 			}
 		})
 	}
+}
+
+// Helper functions for creating pointers
+func intPtr(i int32) *int32 {
+	return &i
+}
+
+func floatPtr(f float64) *float64 {
+	return &f
+}
+
+func TestAdditionService_Overflow(t *testing.T) {
+	additionService := service.NewAdditionService()
+
+	largeNumbers := make([]float64, 1000)
+	for i := range largeNumbers {
+		largeNumbers[i] = math.MaxFloat64
+	}
+
+	req := &v1.AddRequest{
+		Numbers:   largeNumbers,
+		RequestId: "overflow-test",
+	}
+
+	resp, err := additionService.Add(context.Background(), req)
+
+	require.Error(t, err)
+	require.NotNil(t, resp)
+	require.NotNil(t, resp.Error)
+	assert.Equal(t, v1.AddResponse_ErrorInfo_SEVERITY_CRITICAL, resp.Error.Severity)
+	assert.Equal(t, "OVERFLOW", resp.Error.Code)
 }
 
 func TestAdditionService_RequestIDGeneration(t *testing.T) {
